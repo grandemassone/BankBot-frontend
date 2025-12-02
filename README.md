@@ -1,4 +1,5 @@
 # 🏦 BankBot - Frontend Client
+🔗 **Backend Repository:** [View Backend API Code](https://github.com/grandemassone/bank-chatbot-backend)
 
 A modern, responsive web interface for the BankBot AI Assistant.
 Built with performance and type-safety in mind, simulating a premium digital banking experience.
