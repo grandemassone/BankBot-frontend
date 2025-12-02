@@ -35,7 +35,8 @@ Built with performance and type-safety in mind, simulating a premium digital ban
 The app will be available at http://localhost:5173.
 
 ### 🐳 Running with Docker
+```bash
 docker build -t bankbot-frontend .
 docker run -p 5173:5173 bankbot-frontend
-
+```
 Developed by Salvador Davide Passarelli during internship at WeBeetle.
