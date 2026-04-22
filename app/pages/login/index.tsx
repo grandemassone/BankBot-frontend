@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useNavigate } from "react-router";
 import useLogin from "~/services/auth/hooks/useLogin";
+import {useAuth} from '~/context/authContext';
 // Importiamo toast per le notifiche
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -24,6 +25,7 @@ export type LoginFormValues = z.infer<typeof loginSchema>;
 export default function Login() {
     const navigate = useNavigate();
     const { mutate } = useLogin();
+    const { refreshUser } = useAuth();
 
     // 2. Setup React Hook Form
     const {
@@ -43,18 +45,11 @@ export default function Login() {
             email: data.email,
             password: data.password
         }, {
-            onSuccess: (response) => {
-                // Il backend ha risposto 200 OK (Password corretta)
+            onSuccess: async (response) => {
                 toast.dismiss(loadingToast);
                 toast.success("Login effettuato! Benvenuto/a.");
-
-                // Salvataggio token (se il tuo hook non lo fa già automaticamente)
-                // localStorage.setItem('token', response.token);
-
-                // Redirect alla chat
-                setTimeout(() => {
-                    navigate("/chat");
-                }, 1000);
+                await refreshUser();
+                navigate("/chat");
             },
             onError: (error: any) => {
                 // Il backend ha risposto con errore (es. 401 o 400 - Password errata)

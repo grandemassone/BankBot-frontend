@@ -11,8 +11,7 @@ interface User {
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    // checkUserLoggedIn non serve esporlo se è usato solo internamente al useEffect,
-    // ma in futuro qui aggiungerai probabilmente login() e logout()
+    refreshUser: () => Promise<void>;
 }
 
 // 3. Creiamo il context tipizzandolo correttamente
@@ -30,7 +29,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const checkUserLoggedIn = async () => {
         try {
-            const res = await fetch('http://localhost:3000/me', {
+            const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/me`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -54,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Ora value corrisponde al tipo AuthContextType
     return (
-        <AuthContext.Provider value={{ user, loading }}>
+        <AuthContext.Provider value={{ user, loading, refreshUser: checkUserLoggedIn }}>
             {children}
         </AuthContext.Provider>
     );

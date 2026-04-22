@@ -2,7 +2,8 @@ export default async function login(params: {email: string, password: string}){
     const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/login`, {
         method : "post",
         body : JSON.stringify(params),
-        headers : {"content-type" : "application/json"}
+        headers : {"content-type" : "application/json"},
+        credentials: 'include',
     });
 
     // 1. Leggiamo il risultato (che contiene il token o il messaggio di errore)

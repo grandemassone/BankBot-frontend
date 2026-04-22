@@ -11,6 +11,7 @@ import type { Route } from "./+types/root";
 import "./app.css";
 import {QueryClientProvider} from "@tanstack/react-query";
 import {QueryClient} from "@tanstack/query-core";
+import {AuthProvider} from "~/context/authContext";
 
 // 1. RIMOZIONE: Non serve createBrowserRouter né RouterProvider qui.
 // 2. RIMOZIONE: Non importare "Home" qui, è gestito da routes.ts
@@ -50,7 +51,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 const queryClient = new QueryClient()
 export default function App() {
   return <QueryClientProvider client={queryClient}>
-        <Outlet />
+        <AuthProvider>
+            <Outlet />
+        </AuthProvider>
     </QueryClientProvider>
 }
 
