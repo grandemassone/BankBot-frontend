@@ -1,11 +1,15 @@
 import {useEffect, useRef, useState} from 'react'
 import {useNavigate} from 'react-router'
-import {useQueryClient} from '@tanstack/react-query'
+import {useQuery, useQueryClient} from '@tanstack/react-query'
 import {useAuth} from '~/context/authContext'
 import useWsToken from '~/services/chat/hooks/useWsToken'
 import {type ChatMessage, useChat} from '~/services/chat/hooks/useChat'
 import useConversations from '~/services/chat/hooks/useConversations'
 import type {ConversationItem} from '~/services/chat/api/getConversations'
+import {createConversation} from '~/services/chat/api/createConversation'
+import {getConversationMessages} from '~/services/chat/api/getConversationMessages'
+import {updateConversationTitle} from '~/services/chat/api/updateConversationTitle'
+import {mapHistoryToChatMessages, resolveSelectedConversationId} from '~/services/chat/utils/chatState'
 import toast, {Toaster} from 'react-hot-toast'
 
 // ---------------------------------------------------------------------------
@@ -298,12 +302,14 @@ function ConversationSidebar({
     activeConversationId,
     onSelect,
     onNew,
+    onRename,
 }: {
     conversations: ConversationItem[]
     isLoading: boolean
     activeConversationId: string | null
     onSelect: (id: string) => void
     onNew: () => void
+    onRename: (id: string, currentTitle: string) => void
 }) {
     return (
         <div className="w-64 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 h-full">
@@ -324,28 +330,46 @@ function ConversationSidebar({
                 )}
                 {conversations.map((conv) => {
                     const isActive = conv.id === activeConversationId
+                    const titleText = conv.title?.trim() || (conv.preview?.trim() || 'Nuova conversazione')
                     const preview = conv.preview
                         ? conv.preview.length > 40
                             ? conv.preview.slice(0, 40) + '…'
                             : conv.preview
-                        : 'Nuova conversazione'
+                        : null
                     return (
-                        <button
+                        <div
                             key={conv.id}
-                            onClick={() => onSelect(conv.id)}
                             className={`w-full text-left px-3 py-3 border-b border-gray-100 transition ${
                                 isActive
                                     ? 'bg-indigo-50'
                                     : 'hover:bg-gray-50'
                             }`}
                         >
-                            <p className={`text-sm truncate ${isActive ? 'text-indigo-700 font-medium' : 'text-gray-800'}`}>
-                                {preview}
-                            </p>
-                            <p className="text-xs text-gray-400 mt-0.5">
-                                {formatRelativeDate(conv.updatedAt)}
-                            </p>
-                        </button>
+                            <div className="flex items-start gap-2">
+                                <button
+                                    onClick={() => onSelect(conv.id)}
+                                    className="flex-1 min-w-0 text-left"
+                                >
+                                    <p className={`text-sm truncate ${isActive ? 'text-indigo-700 font-medium' : 'text-gray-800'}`}>
+                                        {titleText}
+                                    </p>
+                                    {preview && (
+                                        <p className="text-xs text-gray-500 mt-0.5 truncate">{preview}</p>
+                                    )}
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                        {formatRelativeDate(conv.updatedAt)}
+                                    </p>
+                                </button>
+                                <button
+                                    type="button"
+                                    aria-label="Rinomina conversazione"
+                                    className="text-xs text-gray-500 hover:text-indigo-700"
+                                    onClick={() => onRename(conv.id, conv.title)}
+                                >
+                                    Modifica
+                                </button>
+                            </div>
+                        </div>
                     )
                 })}
             </div>
@@ -369,7 +393,7 @@ export default function ChatPage() {
         }
     }, [loading, user, navigate])
 
-    // Selected conversation (null = most recent)
+    // Selected conversation (in-memory per tab)
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
 
     // Fetch WS token
@@ -380,21 +404,49 @@ export default function ChatPage() {
         messages,
         isTyping,
         isConnected,
-        conversationId,
+        createdConversationId,
         error,
         sendMessage,
-        newConversation: wsNewConversation,
-    } = useChat(wsToken ?? null, selectedConversationId)
-
-    // Sync selectedConversationId when server assigns a new conversationId
-    useEffect(() => {
-        if (conversationId) {
-            setSelectedConversationId(conversationId)
-        }
-    }, [conversationId])
+        replaceMessages,
+    } = useChat(wsToken ?? null)
 
     // Conversation list
     const {data: conversations = [], isLoading: convsLoading} = useConversations()
+
+    // Default selection: first conversation if none selected in this tab
+    useEffect(() => {
+        const nextSelected = resolveSelectedConversationId(selectedConversationId, conversations)
+        if (nextSelected !== selectedConversationId) {
+            setSelectedConversationId(nextSelected)
+        }
+    }, [conversations, selectedConversationId])
+
+    // If WS creates a new conversation, switch this tab to it
+    useEffect(() => {
+        if (createdConversationId) {
+            setSelectedConversationId(createdConversationId)
+            queryClient.invalidateQueries({queryKey: ['conversations']})
+        }
+    }, [createdConversationId, queryClient])
+
+    // History via REST
+    const historyQuery = useQuery({
+        queryKey: ['conversation-messages', selectedConversationId],
+        enabled: !!selectedConversationId,
+        queryFn: () => getConversationMessages(selectedConversationId as string),
+        staleTime: 15_000,
+    })
+
+    useEffect(() => {
+        if (!selectedConversationId) {
+            replaceMessages([])
+            return
+        }
+
+        if (historyQuery.data?.items) {
+            replaceMessages(mapHistoryToChatMessages(historyQuery.data.items))
+        }
+    }, [selectedConversationId, historyQuery.data, replaceMessages])
 
     // Error display
     useEffect(() => {
@@ -403,11 +455,46 @@ export default function ChatPage() {
         }
     }, [error])
 
-    // New conversation: WS event + invalidate list
-    const handleNewConversation = () => {
-        wsNewConversation()
-        setSelectedConversationId(null)
-        queryClient.invalidateQueries({queryKey: ['conversations']})
+    const handleNewConversation = async () => {
+        try {
+            const created = await createConversation()
+            setSelectedConversationId(created.id)
+            replaceMessages([])
+            queryClient.invalidateQueries({queryKey: ['conversations']})
+        } catch {
+            toast.error('Impossibile creare una nuova conversazione.')
+        }
+    }
+
+    const handleRenameConversation = async (id: string, currentTitle: string) => {
+        const nextTitle = window.prompt('Nuovo titolo conversazione', currentTitle || '')
+        if (!nextTitle || nextTitle.trim() === currentTitle.trim()) {
+            return
+        }
+
+        try {
+            await updateConversationTitle(id, nextTitle)
+            queryClient.invalidateQueries({queryKey: ['conversations']})
+        } catch {
+            toast.error('Impossibile aggiornare il titolo della conversazione.')
+        }
+    }
+
+    const handleSendMessage = async (content: string) => {
+        try {
+            let conversationId = selectedConversationId
+            if (!conversationId) {
+                const created = await createConversation()
+                conversationId = created.id
+                setSelectedConversationId(conversationId)
+            }
+
+            queryClient.invalidateQueries({queryKey: ['conversations']})
+            sendMessage(content, conversationId)
+            queryClient.invalidateQueries({queryKey: ['conversations']})
+        } catch {
+            toast.error('Impossibile inviare il messaggio.')
+        }
     }
 
     // Logout
@@ -456,6 +543,7 @@ export default function ChatPage() {
                 activeConversationId={selectedConversationId}
                 onSelect={setSelectedConversationId}
                 onNew={handleNewConversation}
+                onRename={handleRenameConversation}
             />
 
             <div className="flex flex-col flex-1 min-w-0">
@@ -469,8 +557,10 @@ export default function ChatPage() {
                 <MessageList messages={messages} isTyping={isTyping}/>
 
                 <ChatInput
-                    onSend={sendMessage}
-                    disabled={isTyping}
+                    onSend={(content) => {
+                        void handleSendMessage(content)
+                    }}
+                    disabled={isTyping || historyQuery.isLoading}
                     messages={messages}
                 />
             </div>
