@@ -1,43 +1,115 @@
-# 🏦 BankBot - Frontend Client
-🔗 **Backend Repository:** [View Backend API Code](https://github.com/grandemassone/bank-chatbot-backend)
+# BankBot - Frontend
 
-A modern, responsive web interface for the BankBot AI Assistant.
-Built with performance and type-safety in mind, simulating a premium digital banking experience.
+Interfaccia utente dell'assistente bancario BankBot, costruita con **React Router v7**, **TanStack Query**, **Tailwind CSS** e **WebSocket**.
 
-## 🚀 Tech Stack
-* **Framework:** React 18
-* **Language:** TypeScript (Strict typing for financial data reliability)
-* **Build Tool:** Vite (Ultra-fast HMR)
-* **Styling:** TailwindCSS
-* **Routing:** React Router
-* **Containerization:** Docker
+---
 
-## ✨ Key Features
-* **Modern Chat UI:** Responsive chat interface optimized for mobile and desktop.
-* **Real-time Feedback:** Typing indicators and dynamic message rendering.
-* **Secure Architecture:** Clean separation of concerns with API integration layers.
+## Requisiti
 
-## 🛠️ How to Run Locally
+| Tool | Versione minima |
+|------|----------------|
+| Node.js | 20.x |
+| npm | 9.x |
 
-### Prerequisites
-* Node.js (v18+)
-* npm
+> Il frontend richiede che il **backend BankBot sia in esecuzione** su `http://localhost:3000`.
 
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone [https://github.com/grandemassone/bank-chatbot-frontend.git](https://github.com/grandemassone/bank-chatbot-frontend.git)
-2. Install dependencies:
-   ```bash
-   npm install
-3. Run the development server:
-   ```bash
-   npm run dev
-The app will be available at http://localhost:5173.
+---
 
-### 🐳 Running with Docker
+## 1. Clonazione del repository
+
 ```bash
-docker build -t bankbot-frontend .
-docker run -p 5173:5173 bankbot-frontend
+git clone <url-del-repository>
+cd BankBot-frontend
 ```
-Developed by Salvador Davide Passarelli during internship at WeBeetle.
+
+---
+
+## 2. Variabili d'ambiente
+
+Crea un file `.env` nella root del progetto:
+
+```env
+VITE_BACKEND_URL=http://localhost:3000
+```
+
+---
+
+## 3. Installazione delle dipendenze
+
+```bash
+npm install
+```
+
+---
+
+## 4. Avvio in modalita' sviluppo
+
+```bash
+npm run dev
+```
+
+L'applicazione e' disponibile su `http://localhost:5173`.
+
+---
+
+## 5. Build per la produzione
+
+```bash
+npm run build
+npm start
+```
+
+Il server SSR di produzione parte su `http://localhost:3000` (porta configurabile).
+
+---
+
+## 6. Type checking
+
+```bash
+npm run typecheck
+```
+
+---
+
+## 7. Test
+
+```bash
+npm test
+```
+
+Esegue i test unitari sulle utility di stato della chat (`chatState.test.ts`).
+
+---
+
+## Riepilogo comandi
+
+```bash
+# 1. Clona
+git clone <url> && cd BankBot-frontend
+
+# 2. Crea .env
+echo "VITE_BACKEND_URL=http://localhost:3000" > .env
+
+# 3. Installa dipendenze
+npm install
+
+# 4. Avvia in sviluppo
+npm run dev
+
+# oppure per la produzione:
+npm run build && npm start
+```
+
+---
+
+## Prerequisiti di sistema
+
+Prima di avviare il frontend, assicurarsi che il backend sia attivo:
+
+```bash
+# Nella cartella BankBot-backend
+docker compose up -d
+npx knex migrate:latest --knexfile src/knexfile.ts
+npx knex seed:run --knexfile src/knexfile.ts
+npm run start:dev
+```
